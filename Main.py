@@ -1,0 +1,191 @@
+import numpy as np
+import math, re, os, cv2
+import random
+import gc
+from tqdm import tqdm
+import tensorflow as tf
+import numpy as np
+from matplotlib import pyplot as plt
+from kaggle_datasets import KaggleDatasets
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import f1_score, precision_score, recall_score, confusion_matrix
+print("Tensorflow version " + tf.__version__)
+import tensorflow.keras.backend as K
+import tensorflow_addons as tfa
+from skimage.util import random_noise
+from skimage.transform import rotate, AffineTransform, warp
+
+#Path of cloud and Non-cloud datasets
+path = '../input/cloud-anomaly-detection-images/noncloud/noncloud'
+path2 = '../input/cloud-anomaly-detection-images/cloud/cloud'
+
+#Show non-cloud images
+n = 5
+plt.figure(figsize= (20,10))
+
+for i in range(n):
+    ax = plt.subplot(2, n, i+1)
+    plt.imshow(all_images[i+50])
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+
+    ax = plt.subplot(2, n, i+1+n)
+    plt.imshow(all_images[i+20])
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+
+plt.show()
+
+
+
+angle= random.randint(0,180)
+    return rotate(image, angle)
+
+def clockwise_rotation(image):
+    angle= random.randint(0,180)
+    return rotate(image, -angle)
+
+def h_flip(image):
+    return  np.fliplr(image)
+
+def v_flip(image):
+    return np.flipud(image)
+
+def add_noise(image):
+    return random_noise(image)
+
+def blur_image(image):
+    return cv2.GaussianBlur(img, (9,9),0)
+
+#I would not recommend warp_shifting, because it distorts image, but can be used in many use case like 
+#classifying blur and non-blur images
+def warp_shift(image): 
+    transform = AffineTransform(translation=(0,40))  #chose x,y values according to your convinience
+    warp_image = warp(image, transform, mode="wrap")
+    return warp_image
+# aug_images=[]
+# for i in tqdm(all_images):
+#     img = add_noise(i)
+#     img = blur_image(img)
+#     img = warp_shift(img)
+#     aug_images.append(img)
+# aug_images = np.array(aug_images)
+# #Show Augmented non-cloud images
+# n = 5
+# plt.figure(figsize= (20,10))
+
+# for i in range(n):
+#     ax = plt.subplot(2, n, i+1)
+#     plt.imshow(aug_images[i+50])
+#     ax.get_xaxis().set_visible(False)
+#     ax.get_yaxis().set_visible(False)
+
+#     ax = plt.subplot(2, n, i+1+n)
+#     plt.imshow(aug_images[i+20])
+#     ax.get_xaxis().set_visible(False)
+#     ax.get_yaxis().set_visible(False)
+
+# plt.show()
+#Config hyperparameters
+IMAGE_SIZE = [384,384]
+SEED = 42
+n_hidden_1 = 512
+n_hidden_2 = 256
+n_hidden_3 = 64 
+n_hidden_4 = 16
+n_hidden_5 = 8
+convkernel = (3, 3)  # convolution kernel
+poolkernel = (2, 2)  # pooling kernel
+#seeds
+np.random.seed(SEED)
+tf.random.set_seed(SEED)
+try :
+
+    tpu = tf.distribute.cluster_resolver.TPUClusterResolver()  # TPU detection. No parameters necessary if TPU_NAME environment variable is set. On Kaggle this is always the case.
+    print('Running on TPU ', tpu.master())
+except ValueError:
+    tpu = None
+
+if tpu:
+    tf.config.experimental_connect_to_cluster(tpu)
+    tf.tpu.experimental.initialize_tpu_system(tpu)
+    strategy = tf.distribute.experimental.TPUStrategy(tpu)
+else:
+    strategy = tf.distribute.get_strategy() # default distribution strategy in Tensorflow. Works on CPU and single GPU.
+
+print("REPLICAS: ", strategy.num_replicas_in_sync)
+
+    K.clear_session()
+    with strategy.scope():
+        inp1 = tf.keras.layers.Input(shape = (*IMAGE_SIZE, 3))
+
+        x = tf.keras.layers.Conv2D(n_hidden_1, convkernel, activation='relu', padding='same')(inp1)
+        x = tf.keras.layers.Conv2D(n_hidden_1, convkernel, activation='relu', padding='same')(x)
+        x = tf.keras.layers.MaxPooling2D(poolkernel, padding='same')(x)#
+
+        x = tf.keras.layers.Conv2D(n_hidden_2, convkernel, activation='relu', padding='same')(x)
+        x = tf.keras.layers.Conv2D(n_hidden_2, convkernel, activation='relu', padding='same')(x)
+        x = tf.keras.layers.MaxPooling2D(poolkernel, padding='same')(x)#
+
+        x = tf.keras.layers.Conv2D(n_hidden_3, convkernel, activation='relu', padding='same')(x)
+        x = tf.keras.layers.Conv2D(n_hidden_3, convkernel, activation='relu', padding='same')(x)
+        x = tf.keras.layers.Conv2D(n_hidden_3, convkernel, activation='relu', padding='same')(x)
+        x = tf.keras.layers.Conv2D(n_hidden_3, convkernel, activation='relu', padding='same')(x)
+        x = tf.keras.layers.MaxPooling2D(poolkernel, padding='same')(x)#
+
+        x = tf.keras.layers.Conv2D(n_hidden_4, convkernel, activation='relu', padding='same')(x)
+        x = tf.keras.layers.Conv2D(n_hidden_4, convkernel, activation='relu', padding='same')(x)
+        x = tf.keras.layers.Conv2D(n_hidden_4, convkernel, activation='relu', padding='same')(x)
+        x = tf.keras.layers.Conv2D(n_hidden_4, convkernel, activation='relu', padding='same')(x)
+        x = tf.keras.layers.MaxPooling2D(poolkernel, padding='same')(x)#
+
+        x = tf.keras.layers.Conv2D(n_hidden_5, convkernel, activation='relu', padding='same')(x)
+        x = tf.keras.layers.Conv2D(n_hidden_5, convkernel, activation='relu', padding='same')(x)
+        x = tf.keras.layers.Conv2D(n_hidden_5, convkernel, activation='relu', padding='same')(x)
+        encoded = tf.keras.layers.Conv2D(n_hidden_5, convkernel, activation='relu', padding='same')(x)
+
+
+        #decoder
+        x = tf.keras.layers.Conv2DTranspose(n_hidden_5, convkernel, strides=2, activation='relu', padding='same')(encoded)
+        x = tf.keras.layers.Conv2DTranspose(n_hidden_4, convkernel, strides=2, activation='relu', padding='same')(x)
+        x = tf.keras.layers.Conv2DTranspose(n_hidden_3, convkernel, strides=2, activation='relu', padding='same')(x)
+        x = tf.keras.layers.Conv2DTranspose(n_hidden_2, convkernel, strides=2, activation='relu', padding='same')(x)
+        x = tf.keras.layers.Conv2DTranspose(n_hidden_1, convkernel, strides=1, activation='relu', padding='same')(x)
+
+        decoded = tf.keras.layers.Conv2DTranspose(3, convkernel, activation="sigmoid", padding='same')(x)
+
+        model = tf.keras.models.Model(inputs = inp1, outputs = decoded)
+
+        opt = tfa.optimizers.RectifiedAdam(lr=3e-4)
+        model.compile(
+            optimizer = opt,
+            loss = 'mse',
+            metrics = [tf.keras.metrics.RootMeanSquaredError()]
+        )
+
+        return model
+#Used Pretrained VGG19 for Encoder and Transposed convolution for Decoder
+
+def get_vgg19():
+    K.clear_session()
+    with strategy.scope():
+        image_input = tf.keras.layers.Input(shape = (*IMAGE_SIZE,3))
+        vg19 = tf.keras.applications.VGG19(input_tensor = image_input, weights = 'imagenet', include_top=False)
+        encoded = vg19.get_layer('block5_pool').output
+        #decode
+        x = tf.keras.layers.Conv2DTranspose(n_hidden_5, convkernel, strides=2, activation='relu', padding='same')(encoded)
+        x = tf.keras.layers.Conv2DTranspose(n_hidden_4, convkernel, strides=2, activation='relu', padding='same')(x)
+        x = tf.keras.layers.Conv2DTranspose(n_hidden_3, convkernel, strides=2, activation='relu', padding='same')(x)
+        x = tf.keras.layers.Conv2DTranspose(n_hidden_2, convkernel, strides=2, activation='relu', padding='same')(x)
+        x = tf.keras.layers.Conv2DTranspose(n_hidden_1, convkernel, strides=2, activation='relu', padding='same')(x)
+        decoded = tf.keras.layers.Conv2DTranspose(3, convkernel, activation="sigmoid", padding='same')(x)
+        model = tf.keras.models.Model(inputs = image_input, outputs = decoded)
+        opt = tfa.optimizers.RectifiedAdam(lr=3e-4)
+        model.compile(
+            optimizer = opt,
+            loss = 'mse',
+            metrics = [tf.keras.metrics.RootMeanSquaredError()]
+        )
+        return model
+model=  get_vgg19() #get_model()
+model.summary()
