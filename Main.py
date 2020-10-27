@@ -194,3 +194,12 @@ model.summary()
 X_train, X_test = train_test_split(all_images, test_size=0.2, random_state=SEED)
 print(X_train.shape, X_test.shape)
 
+del all_images;  gc.collect()
+
+#model training config params
+EPOCHS = 100
+BATCH_SIZE = 16
+NUM_TRAINING_IMAGES = X_train.shape[0]
+steps = NUM_TRAINING_IMAGES // BATCH_SIZE
+NUM_VALID_IMAGES = X_test.shape[0]
+val_steps = NUM_VALID_IMAGES // BATCH_SIZE
