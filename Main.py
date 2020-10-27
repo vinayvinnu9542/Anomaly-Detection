@@ -203,3 +203,23 @@ NUM_TRAINING_IMAGES = X_train.shape[0]
 steps = NUM_TRAINING_IMAGES // BATCH_SIZE
 NUM_VALID_IMAGES = X_test.shape[0]
 val_steps = NUM_VALID_IMAGES // BATCH_SIZE
+
+
+#Model training
+sav = tf.keras.callbacks.ModelCheckpoint(
+    
+    'Enc'+'.h5', monitor='val_loss', verbose=1, save_best_only=True,
+    save_weights_only=True, mode='min', save_freq='epoch')
+# lr scheduler
+cb_lr_schedule = tf.keras.callbacks.ReduceLROnPlateau(monitor = 'val_loss', factor = 0.4, patience = 2,
+                                                      verbose = 1, mode = 'min',min_delta = 0.0001)
+
+early_stopping = tf.keras.callbacks.EarlyStopping(monitor = 'val_loss', mode = 'min', patience = 5, 
+                                                  verbose = 1, min_delta = 0.0001)
+model.fit(X_train, X_train,
+      validation_data=(X_test, X_test),
+      steps_per_epoch=steps,
+      validation_steps=val_steps,
+      epochs = EPOCHS,
+      callbacks= [sav, cb_lr_schedule,early_stopping],
+      verbose = 1)
