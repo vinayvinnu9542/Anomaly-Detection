@@ -115,8 +115,8 @@ else:
 
 print("REPLICAS: ", strategy.num_replicas_in_sync)
 
-    K.clear_session()
-    with strategy.scope():
+K.clear_session()
+with strategy.scope():
         inp1 = tf.keras.layers.Input(shape = (*IMAGE_SIZE, 3))
 
         x = tf.keras.layers.Conv2D(n_hidden_1, convkernel, activation='relu', padding='same')(inp1)
@@ -189,3 +189,8 @@ def get_vgg19():
         return model
 model=  get_vgg19() #get_model()
 model.summary()
+
+#Split the dataset into train and test with a ratio of 80:20.
+X_train, X_test = train_test_split(all_images, test_size=0.2, random_state=SEED)
+print(X_train.shape, X_test.shape)
+
