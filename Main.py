@@ -16,8 +16,8 @@ from skimage.util import random_noise
 from skimage.transform import rotate, AffineTransform, warp
 
 #Path of cloud and Non-cloud datasets
-path = '../input/cloud-anomaly-detection-images/noncloud/noncloud'
-path2 = '../input/cloud-anomaly-detection-images/cloud/cloud'
+path = 'https://kaggle datasets download -d ashoksrinivas/cloud-anomaly-detection-images/noncloud/noncloud'
+path2 = 'https://kaggle datasets download -d ashoksrinivas/cloud-anomaly-detection-images/cloud/cloud'
 
 #Show non-cloud images
 n = 5
